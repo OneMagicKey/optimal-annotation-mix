@@ -119,20 +119,19 @@ def plot_results_with_masks(file="path/to/results.csv", dir="", best=True):
     Example: from utils.plots import *; plot_results('path/to/results.csv')
     """
     save_dir = Path(file).parent if file else Path(dir)
-    fig, ax = plt.subplots(2, 8, figsize=(18, 6), tight_layout=True)
+    fig, ax = plt.subplots(2, 9, figsize=(18, 6), tight_layout=True)
     ax = ax.ravel()
     files = list(save_dir.glob("results*.csv"))
     assert len(files), f"No results.csv files found in {save_dir.resolve()}, nothing to plot."
     for f in files:
         try:
             data = pd.read_csv(f)
-            index = np.argmax(
-                0.9 * data.values[:, 8] + 0.1 * data.values[:, 7] + 0.9 * data.values[:, 12] + 0.1 * data.values[:, 11]
-            )
+            index = np.nanargmax(0.8 * data.values[:, 9] + 0.1 * data.values[:, 8] + 0.1 * data.values[:, 7] +
+                                 0.1 * data.values[:, 12] + 0.1 * data.values[:, 13] + 0.8 * data.values[:, 14])
             s = [x.strip() for x in data.columns]
             x = data.values[:, 0]
-            for i, j in enumerate([1, 2, 3, 4, 5, 6, 9, 10, 13, 14, 15, 16, 7, 8, 11, 12]):
-                y = data.values[:, j]
+            for i, j in enumerate([1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 17, 18, 7, 8, 9, 12, 13, 14]):
+                y = data.values[:, j].astype(np.float32)
                 # y[y == 0] = np.nan  # don't show zero values
                 ax[i].plot(x, y, marker=".", label=f.stem, linewidth=2, markersize=2)
                 if best:

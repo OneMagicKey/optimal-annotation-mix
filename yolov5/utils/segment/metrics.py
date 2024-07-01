@@ -7,9 +7,9 @@ from ..metrics import ap_per_class
 
 
 def fitness(x):
-    """Evaluates model fitness by a weighted sum of 8 metrics, `x`: [N,8] array, weights: [0.1, 0.9] for mAP and F1."""
-    w = [0.0, 0.0, 0.1, 0.9, 0.0, 0.0, 0.1, 0.9]
-    return (x[:, :8] * w).sum(1)
+    """Evaluates model fitness by a weighted sum of 10 metrics, `x`: [N,10] array, weights: [0.1, 0.8] for mAP and F1."""
+    w = [0.0, 0.0, 0.1, 0.1, 0.8, 0.0, 0.0, 0.1, 0.1, 0.8]
+    return (x[:, :10] * w).sum(1)
 
 
 def ap_per_class_box_and_mask(
@@ -75,6 +75,14 @@ class Metric:
         return self.all_ap[:, 0] if len(self.all_ap) else []
 
     @property
+    def ap70(self):
+        """AP@0.7 of all classes.
+        Return:
+            (nc, ) or [].
+        """
+        return self.all_ap[:, 4] if len(self.all_ap) else []
+
+    @property
     def ap(self):
         """AP@0.5:0.95
         Return:
@@ -113,6 +121,14 @@ class Metric:
         return self.all_ap[:, 0].mean() if len(self.all_ap) else 0.0
 
     @property
+    def map70(self):
+        """Mean AP@0.7 of all classes.
+        Return:
+            float.
+        """
+        return self.all_ap[:, 4].mean() if len(self.all_ap) else 0.0
+
+    @property
     def map(self):
         """
         Mean AP@0.5:0.95 of all classes.
@@ -123,12 +139,12 @@ class Metric:
         return self.all_ap.mean() if len(self.all_ap) else 0.0
 
     def mean_results(self):
-        """Mean of results, return mp, mr, map50, map."""
-        return (self.mp, self.mr, self.map50, self.map)
+        """Mean of results, return mp, mr, map50, map70, map"""
+        return (self.mp, self.mr, self.map50, self.map70, self.map)
 
     def class_result(self, i):
-        """Class-aware result, return p[i], r[i], ap50[i], ap[i]"""
-        return (self.p[i], self.r[i], self.ap50[i], self.ap[i])
+        """class-aware result, return p[i], r[i], ap50[i], ap70[i], ap[i]"""
+        return (self.p[i], self.r[i], self.ap50[i], self.ap70[i], self.ap[i])
 
     def get_maps(self, nc):
         """Calculates and returns mean Average Precision (mAP) for each class given number of classes `nc`."""
@@ -196,10 +212,12 @@ KEYS = [
     "metrics/precision(B)",
     "metrics/recall(B)",
     "metrics/mAP_0.5(B)",
+    "metrics/mAP_0.7(B)",
     "metrics/mAP_0.5:0.95(B)",  # metrics
     "metrics/precision(M)",
     "metrics/recall(M)",
     "metrics/mAP_0.5(M)",
+    "metrics/mAP_0.7(M)",
     "metrics/mAP_0.5:0.95(M)",  # metrics
     "val/box_loss",
     "val/seg_loss",  # val loss
@@ -215,9 +233,11 @@ BEST_KEYS = [
     "best/precision(B)",
     "best/recall(B)",
     "best/mAP_0.5(B)",
+    "best/mAP_0.7(B)",
     "best/mAP_0.5:0.95(B)",
     "best/precision(M)",
     "best/recall(M)",
     "best/mAP_0.5(M)",
+    "best/mAP_0.7(M)",
     "best/mAP_0.5:0.95(M)",
 ]

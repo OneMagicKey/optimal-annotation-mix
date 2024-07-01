@@ -180,7 +180,7 @@ def run(
     save_dir=Path(""),
     plots=True,
     overlap=False,
-    mask_downsample_ratio=1,
+    mask_downsample_ratio=4,
     compute_loss=None,
     callbacks=Callbacks(),
 ):
@@ -263,17 +263,19 @@ def run(
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
     class_map = coco80_to_coco91_class() if is_coco else list(range(1000))
-    s = ("%22s" + "%11s" * 10) % (
+    s = ("%22s" + "%11s" * 12) % (
         "Class",
         "Images",
         "Instances",
         "Box(P",
         "R",
         "mAP50",
+        "mAP70",
         "mAP50-95)",
         "Mask(P",
         "R",
         "mAP50",
+        "mAP70",
         "mAP50-95)",
     )
     dt = Profile(device=device), Profile(device=device), Profile(device=device)
@@ -387,7 +389,7 @@ def run(
     nt = np.bincount(stats[4].astype(int), minlength=nc)  # number of targets per class
 
     # Print results
-    pf = "%22s" + "%11i" * 2 + "%11.3g" * 8  # print format
+    pf = "%22s" + "%11i" * 2 + "%11.3g" * 10  # print format
     LOGGER.info(pf % ("all", seen, nt.sum(), *metrics.mean_results()))
     if nt.sum() == 0:
         LOGGER.warning(f"WARNING ⚠️ no labels found in {task} set, can not compute metrics without labels")
@@ -408,7 +410,7 @@ def run(
         confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
     # callbacks.run('on_val_end')
 
-    mp_bbox, mr_bbox, map50_bbox, map_bbox, mp_mask, mr_mask, map50_mask, map_mask = metrics.mean_results()
+    mp_bbox, mr_bbox, map50_bbox, map70_bbox, map_bbox, mp_mask, mr_mask, map50_mask, map70_mask, map_mask = metrics.mean_results()
 
     # Save JSON
     if save_json and len(jdict):
@@ -442,7 +444,7 @@ def run(
     if not training:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ""
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
-    final_metric = mp_bbox, mr_bbox, map50_bbox, map_bbox, mp_mask, mr_mask, map50_mask, map_mask
+    final_metric = mp_bbox, mr_bbox, map50_bbox, map70_bbox, map_bbox, mp_mask, mr_mask, map50_mask, map70_mask, map_mask
     return (*final_metric, *(loss.cpu() / len(dataloader)).tolist()), metrics.get_maps(nc), t
 
 
