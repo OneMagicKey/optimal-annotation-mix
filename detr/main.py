@@ -118,6 +118,8 @@ def main(args):
     np.random.seed(seed)
     random.seed(seed)
 
+    torch.set_float32_matmul_precision('high')
+
     model, criterion, postprocessors = build_model(args)
     model.to(device)
 
