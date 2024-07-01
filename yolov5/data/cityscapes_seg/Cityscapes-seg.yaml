@@ -1,0 +1,66 @@
+path: ../datasets/Cityscapes/data  # dataset root dir
+train: images/train # train images (relative to 'path') 2975 images
+train_weak: # train weak images (optional)
+val: images/val  # val images (relative to 'path') 500 images
+test:  # test images (optional)
+
+# Classes
+names:
+  0: person
+  1: rider
+  2: car
+  3: truck
+  4: bus
+  5: train
+  6: motorcycle
+  7: bicycle
+  
+  
+  # Download
+download: |
+  import numpy as np
+  import os
+  import shutil
+  from tqdm import tqdm
+  from utils.general import Path
+  from data.cityscapes_seg.utils_cityscapes import img_label2masks, mask2segments, segments2polygon 
+  
+
+  dir = Path(yaml['path'])  # dataset root dir
+  
+  # Convert
+  names = list(yaml['names'].values())
+  ids_instanceonly = list(range(24, 29)) + list(range(31, 34))
+  new_labels = {old:new for (new, old) in enumerate(ids_instanceonly)} # map labels to {0, ..., n}
+  
+  for split in ['train', 'val']:
+      imgs_dir_new = f'{dir}/images/{split}'
+      targets_dir_new = f'{dir}/labels/{split}'
+      os.makedirs(imgs_dir_new, exist_ok=True)
+      os.makedirs(targets_dir_new, exist_ok=True)
+
+      images_dir = os.path.join(dir, f'leftImg8bit/{split}')
+      targets_dir = os.path.join(dir, f'gtFine/{split}')
+
+      for city in tqdm(os.listdir(images_dir), desc=f'{split}'):
+          img_dir = os.path.join(images_dir, city)
+          target_dir = os.path.join(targets_dir, city)
+          
+          for file_name in os.listdir(img_dir):
+              target_name = f'{file_name.split("_leftImg8bit")[0]}{"_gtFine_instanceIds.png"}'
+              
+              seg_masks, classes, (h, w) = img_label2masks(os.path.join(target_dir, target_name), ids_instanceonly)
+              classes = [new_labels[old_label] for old_label in classes]
+              shutil.copy(os.path.join(img_dir, file_name), f'{imgs_dir_new}/{file_name}')
+              
+              with open(f'{targets_dir_new}/{file_name.split(".png")[0]}.txt', 'w') as f:
+                  for mask, cls in zip(seg_masks, classes):
+                      segments = mask2segments(mask)
+                      polygon = segments2polygon(segments)
+                      if polygon.shape[0] == 0:
+                          continue
+
+                      polygon = (polygon / np.array([w, h])).reshape(-1) # normalize by img size
+                      polygon = np.round(polygon, 6).astype(str)
+                      cls_and_poly = f'{cls} '+' '.join(polygon)+'\n'
+                      f.write(cls_and_poly)

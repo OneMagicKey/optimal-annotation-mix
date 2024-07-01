@@ -1,0 +1,89 @@
+# PASCAL VOC 2012 dataset http://host.robots.ox.ac.uk/pascal/VOC by University of Oxford
+# parent
+# ├── yolov5
+# └── datasets
+#     └── VOC  ← downloads here (1.95 GB)
+
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: ../datasets/VOC  # dataset root dir
+train: images/train # train images (relative to 'path') 1464 images
+train_weak: # weak images (optional)
+val: images/val  # val images (relative to 'path') 1449 images
+test:  # test images (optional)
+
+# Classes
+names:
+  0: aeroplane
+  1: bicycle
+  2: bird
+  3: boat
+  4: bottle
+  5: bus
+  6: car
+  7: cat
+  8: chair
+  9: cow
+  10: diningtable
+  11: dog
+  12: horse
+  13: motorbike
+  14: person
+  15: pottedplant
+  16: sheep
+  17: sofa
+  18: train
+  19: tvmonitor
+
+
+  # Download
+download: |
+  import numpy as np
+  from scipy.spatial.distance import cdist
+  from shutil import copy
+  from tqdm import tqdm
+  from utils.general import download, Path
+  from data.voc_seg.utils_voc import convert_label, img_label2masks, mask2segments, segments2polygon, get_class_label
+  
+
+  dir = Path(yaml['path'])  # dataset root dir
+  url = 'https://github.com/ultralytics/yolov5/releases/download/v1.0/'
+  urls = [f'{url}VOCtrainval_11-May-2012.zip']  # 1.95GB, 1464 + 1449 images
+  download(urls, dir=dir, delete=False, curl=True, threads=3)
+  
+  # Convert
+  path = dir / 'VOCdevkit' / 'VOC2012'
+  
+  names = list(yaml['names'].values())
+  for split in ['train', 'val']:
+      imgs_path = dir / 'images' / split
+      lbs_path = dir / 'labels' / split
+      imgs_path.mkdir(exist_ok=True, parents=True)
+      lbs_path.mkdir(exist_ok=True, parents=True)
+      
+      with open(path / f'ImageSets/Segmentation/{split}.txt', 'r') as ids_file:
+          img_ids = ids_file.read().strip().split()
+  
+      for img_id in tqdm(img_ids, desc=split):
+          old_img_path = path / 'JPEGImages' / f'{img_id}.jpg'
+          copy(old_img_path, imgs_path / f'{img_id}.jpg')
+          
+          label_path = path / 'SegmentationObject' / f'{img_id}.png'
+          class_labels = get_class_label(path, img_id, names)
+          seg_masks, (h, w) = img_label2masks(label_path, class_labels)
+
+          class_labels = np.array(class_labels)
+          class_labels = class_labels[class_labels != -1]
+          assert seg_masks.shape[0] == class_labels.shape[0], 'number of class labels should be equal to number of masks'
+
+          with open(lbs_path / f'{img_id}.txt', 'w') as f:
+              for mask, cls in zip(seg_masks, class_labels):
+                  segments = mask2segments(mask)
+                  polygon = segments2polygon(segments)
+                  if polygon.shape[0] == 0:
+                      continue
+
+                  polygon = (polygon / np.array([w, h])).reshape(-1)  # normalize by img size
+                  polygon = np.round(polygon, 6).astype(str)
+                  cls_and_poly = f'{cls} ' + ' '.join(polygon) + '\n'
+                  f.write(cls_and_poly)

@@ -1,0 +1,60 @@
+# PASCAL VOC 2012 dataset http://host.robots.ox.ac.uk/pascal/VOC by University of Oxford
+# parent
+# ├── yolov5
+# └── datasets
+#     └── VOC  ← downloads here (1.95 GB)
+
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: ../datasets/VOC  # dataset root dir
+train: images/train # train images (relative to 'path') 200 images
+train_weak: images/train_weak # train_weak images (relative to 'path') 1000 images
+val: images/val  # val images (relative to 'path') 1449 images
+test:  # test images (optional)
+
+# Classes
+names:
+  0: aeroplane
+  1: bicycle
+  2: bird
+  3: boat
+  4: bottle
+  5: bus
+  6: car
+  7: cat
+  8: chair
+  9: cow
+  10: diningtable
+  11: dog
+  12: horse
+  13: motorbike
+  14: person
+  15: pottedplant
+  16: sheep
+  17: sofa
+  18: train
+  19: tvmonitor
+
+
+  # Download
+download: |
+  from utils.general import download, Path
+  from data.voc_seg.utils_voc import prepare_indices, convert_voc
+  
+
+  dir = Path(yaml['path'])  # dataset root dir
+  url = 'https://github.com/ultralytics/yolov5/releases/download/v1.0/'
+  urls = [f'{url}VOCtrainval_11-May-2012.zip']  # 1.95GB, 1464 + 1449 images
+  download(urls, dir=dir, delete=False, curl=True, threads=3)
+  
+  # Convert
+  path = dir / 'VOCdevkit/VOC2012'
+  
+  trainval_bbox_ids = open(path / 'ImageSets/Main/trainval.txt', 'r').read().strip().split() # imgs with bbox annotation
+  train_seg_ids = open(path / 'ImageSets/Segmentation/train.txt', 'r').read().strip().split()
+  val_seg_ids = open(path / 'ImageSets/Segmentation/val.txt', 'r').read().strip().split()
+  train_weak_ids = sorted(set(trainval_bbox_ids).difference(set(val_seg_ids)).difference(set(train_seg_ids)))
+  
+  names = list(yaml['names'].values())
+  ids = prepare_indices(path, 200, 1000)
+  convert_voc(dir, path, ids, names)

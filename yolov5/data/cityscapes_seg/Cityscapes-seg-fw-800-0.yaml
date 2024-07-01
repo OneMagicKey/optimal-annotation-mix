@@ -1,0 +1,34 @@
+path: ../datasets/Cityscapes/data  # dataset root dir
+train: images/train # train images (relative to 'path') 800 images
+train_weak: images/train_weak # train weak images (optional) 0 images
+val: images/val  # val images (relative to 'path') 500 images
+test:  # test images (optional)
+
+# Classes
+names:
+  0: person
+  1: rider
+  2: car
+  3: truck
+  4: bus
+  5: train
+  6: motorcycle
+  7: bicycle
+
+
+  # Download
+download: |
+  from utils.general import Path
+  from data.cityscapes_seg.utils_cityscapes import create_train_val_split, prepare_ids, convert_cityscapes
+  
+
+  dir = Path(yaml['path'])  # dataset root dir
+  
+  # Convert
+  names = list(yaml['names'].values())
+  ids_instanceonly = list(range(24, 29)) + list(range(31, 34))
+  new_labels = {old:new for (new, old) in enumerate(ids_instanceonly)} # map labels to {0, ..., n}
+  
+  images, targets = create_train_val_split(dir)
+  images, targets = prepare_ids(images, targets, num_f=800, num_w=0)
+  convert_cityscapes(dir, images, targets, ids_instanceonly, new_labels)
