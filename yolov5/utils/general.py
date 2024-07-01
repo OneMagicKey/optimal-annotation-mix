@@ -531,7 +531,7 @@ def check_dataset(data, autodownload=True):
         data = yaml_load(data)  # dictionary
 
     # Checks
-    for k in "train", "val", "names":
+    for k in "train", "train_weak", "val", "names":
         assert k in data, emojis(f"data.yaml '{k}:' field missing ❌")
     if isinstance(data["names"], (list, tuple)):  # old array format
         data["names"] = dict(enumerate(data["names"]))  # convert to dict
@@ -543,7 +543,7 @@ def check_dataset(data, autodownload=True):
     if not path.is_absolute():
         path = (ROOT / path).resolve()
         data["path"] = path  # download scripts
-    for k in "train", "val", "test":
+    for k in "train", "train_weak", "val", "test":
         if data.get(k):  # prepend path
             if isinstance(data[k], str):
                 x = (path / data[k]).resolve()

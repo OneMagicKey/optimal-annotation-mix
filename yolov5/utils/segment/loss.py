@@ -45,7 +45,7 @@ class ComputeLoss:
         self.anchors = m.anchors
         self.device = device
 
-    def __call__(self, preds, targets, masks):  # predictions, targets, model
+    def __call__(self, preds, targets, masks, shift=None):  # predictions, targets, model
         """Evaluates YOLOv5 model's loss for given predictions, targets, and masks; returns total loss components."""
         p, proto = preds
         bs, nm, mask_h, mask_w = proto.shape  # batch size, number of masks, mask height, mask width
@@ -55,6 +55,7 @@ class ComputeLoss:
         lseg = torch.zeros(1, device=self.device)
         tcls, tbox, indices, anchors, tidxs, xywhn = self.build_targets(p, targets)  # targets
 
+        shift = bs if shift is None else shift
         # Losses
         for i, pi in enumerate(p):  # layer index, layer predictions
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
@@ -92,6 +93,8 @@ class ComputeLoss:
                 marea = xywhn[i][:, 2:].prod(1)  # mask width, height normalized
                 mxyxy = xywh2xyxy(xywhn[i] * torch.tensor([mask_w, mask_h, mask_w, mask_h], device=self.device))
                 for bi in b.unique():
+                    if bi >= shift:  # do not calculate mask loss for the "weak" images
+                        continue
                     j = b == bi  # matching index
                     if self.overlap:
                         mask_gti = torch.where(masks[bi][None] == tidxs[i][j].view(-1, 1, 1), 1.0, 0.0)
@@ -109,7 +112,7 @@ class ComputeLoss:
         lbox *= self.hyp["box"]
         lobj *= self.hyp["obj"]
         lcls *= self.hyp["cls"]
-        lseg *= self.hyp["box"] / bs
+        lseg *= self.hyp["box"] / shift
 
         loss = lbox + lobj + lcls + lseg
         return loss * bs, torch.cat((lbox, lseg, lobj, lcls)).detach()

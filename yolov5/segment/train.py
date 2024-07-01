@@ -163,7 +163,7 @@ def train(hyp, opt, device, callbacks):
     init_seeds(opt.seed + 1 + RANK, deterministic=True)
     with torch_distributed_zero_first(LOCAL_RANK):
         data_dict = data_dict or check_dataset(data)  # check if None
-    train_path, val_path = data_dict["train"], data_dict["val"]
+    train_path, train_weak_path, val_path = data_dict["train"], data_dict["train_weak"], data_dict["val"]
     nc = 1 if single_cls else int(data_dict["nc"])  # number of classes
     names = {0: "item"} if single_cls and len(data_dict["names"]) != 1 else data_dict["names"]  # class names
     is_coco = isinstance(val_path, str) and val_path.endswith("coco/val2017.txt")  # COCO dataset
@@ -245,10 +245,44 @@ def train(hyp, opt, device, callbacks):
         LOGGER.info("Using SyncBatchNorm()")
 
     # Trainloader
+    if opt.f_size != -1:
+        assert opt.f_size > 0, "batch_size_full must be a positive value"
+        batch_size_full, batch_size_weak = opt.f_size, batch_size - opt.f_size
+
+        train_weak_loader, dataset_weak = create_dataloader(
+            train_weak_path,
+            imgsz,
+            batch_size_weak // WORLD_SIZE,
+            gs,
+            single_cls,
+            hyp=hyp,
+            augment=True,
+            cache=None if opt.cache == "val" else opt.cache,
+            rect=opt.rect,
+            rank=LOCAL_RANK,
+            workers=workers,
+            image_weights=opt.image_weights,
+            quad=opt.quad,
+            prefix=colorstr("train_weak: "),
+            shuffle=True,
+            mask_downsample_ratio=mask_ratio,
+            overlap_mask=overlap,
+        )
+
+        def infinite_loader(loader):
+            while True:
+                yield from loader
+
+        weak_dataloader = infinite_loader(train_weak_loader)
+    else:
+        # Default settings
+        batch_size_full, batch_size_weak = batch_size, 0
+        dataset_weak = []
+
     train_loader, dataset = create_dataloader(
         train_path,
         imgsz,
-        batch_size // WORLD_SIZE,
+        batch_size_full // WORLD_SIZE,
         gs,
         single_cls,
         hyp=hyp,
@@ -264,6 +298,8 @@ def train(hyp, opt, device, callbacks):
         mask_downsample_ratio=mask_ratio,
         overlap_mask=overlap,
     )
+
+    dataset = dataset_weak if len(dataset_weak) > len(dataset) else dataset
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f"Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}"
@@ -326,6 +362,7 @@ def train(hyp, opt, device, callbacks):
     # callbacks.run('on_train_start')
     LOGGER.info(
         f'Image sizes {imgsz} train, {imgsz} val\n'
+        f'Batch sizes: {batch_size_full} full, {batch_size_weak} weak\n'
         f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
         f"Logging results to {colorstr('bold', save_dir)}\n"
         f'Starting training for {epochs} epochs...'
@@ -357,6 +394,13 @@ def train(hyp, opt, device, callbacks):
         optimizer.zero_grad()
         for i, (imgs, targets, paths, _, masks) in pbar:  # batch ------------------------------------------------------
             # callbacks.run('on_train_batch_start')
+            curr_full_size = imgs.shape[0]  # to handle drop_last=False in train dataloader
+            if opt.f_size != -1:
+                # Merge full and weak batches into a single batch
+                imgs_w, targets_w, paths_w, _, masks_w = next(weak_dataloader)
+                targets_w[:, 0] += curr_full_size  # shift to a new indices
+                imgs, targets, masks = map(torch.cat, [[imgs, imgs_w], [targets, targets_w], [masks, masks_w]])
+                paths = paths + paths_w
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device, non_blocking=True).float() / 255  # uint8 to float32, 0-255 to 0.0-1.0
 
@@ -382,7 +426,8 @@ def train(hyp, opt, device, callbacks):
             # Forward
             with torch.cuda.amp.autocast(amp):
                 pred = model(imgs)  # forward
-                loss, loss_items = compute_loss(pred, targets.to(device), masks=masks.to(device).float())
+                loss, loss_items = compute_loss(pred, targets.to(device), masks=masks.to(device).float(),
+                                                shift=curr_full_size)
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -585,6 +630,7 @@ def parse_opt(known=False):
     # Instance Segmentation Args
     parser.add_argument("--mask-ratio", type=int, default=4, help="Downsample the truth masks to saving memory")
     parser.add_argument("--no-overlap", action="store_true", help="Overlap masks train faster at slightly less mAP")
+    parser.add_argument('--f-size', type=int, default=-1, help="size of full part of a batch, disabled by default")
 
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
