@@ -477,7 +477,7 @@ def train(hyp, opt, device, callbacks):
             # callbacks.run('on_train_epoch_end', epoch=epoch)
             ema.update_attr(model, include=["yaml", "nc", "hyp", "names", "stride", "class_weights"])
             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
-            if not noval or final_epoch:  # Calculate mAP
+            if not epoch % max(epochs // 100, 1) or final_epoch:  # Calculate mAP
                 results, maps, _ = validate.run(
                     data_dict,
                     batch_size=batch_size // WORLD_SIZE * 2,
@@ -506,7 +506,7 @@ def train(hyp, opt, device, callbacks):
             logger.log_metrics(metrics_dict, epoch)
 
             # Save model
-            if (not nosave) or (final_epoch and not evolve):  # if save
+            if not epoch % max(epochs // 100, 1) or (final_epoch and not evolve):  # if save
                 ckpt = {
                     "epoch": epoch,
                     "best_fitness": best_fitness,
