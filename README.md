@@ -5,9 +5,6 @@
 Here we present the scripts to run experiments with **YOLOv5** model. For the **DETR** model, 
 see jupyter notebook.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/OneMagicKey/optimal-annotation-mix/blob/master/run.ipynb)
-
-
 ### Data splits
 To emulate different setups, we created *.yaml* files with different data splits and placed them 
 in _yolov5/data_:
@@ -30,7 +27,7 @@ and *12* weakly annotated images. To train on full images only, you can use *f-s
 ### YOLO training
 Clone the repo
 ```bash
-git clone https://github.com/OneMagicKey/optimal-annotation-mix.git
+git clone XXXX
 cd optimal-annotation-mix/yolov5
 ```
 and install all the dependencies:
@@ -65,15 +62,6 @@ the following structure
         └── data
             ├── gtFine
             └── leftImg8bit
-```
-
-or download it from [Google Drive](https://drive.google.com/file/d/1Jb2rGbcOOykIDpoqlSZQXg-DsmC9DGdG/view?usp=drive_link)
-and extract it with the command:
-
-```bash
-# yolov5 is the current dir
-path_to_cityscapes = 'path/to/Cityscapes.zip'
-cd .. &&  mkdir -p 'datasets/Cityscapes' && unzip -nq $path_to_cityscapes -d 'datasets/' && cd yolov5
 ```
 
 Then run the training:
