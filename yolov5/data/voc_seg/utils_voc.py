@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 import xml.etree.ElementTree as ET
 from scipy.spatial.distance import cdist
 from PIL import Image
@@ -14,22 +15,25 @@ def convert_label(path, lb_path, image_id, names):
         xmin, xmax, ymin, ymax = xmin / w, xmax / w, ymin / h, ymax / h
         return xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax
 
-    in_file = open(path / 'Annotations' / f'{image_id}.xml')
-    out_file = open(lb_path, 'w')
-    tree = ET.parse(in_file)
+    with open(path / 'Annotations' / f'{image_id}.xml', 'r') as in_file:
+        tree = ET.parse(in_file)
     root = tree.getroot()
     size = root.find('size')
     w = int(size.find('width').text)
     h = int(size.find('height').text)
 
-    for obj in root.iter('object'):
-        cls = obj.find('name').text
-        if cls in names and int(obj.find('difficult').text) != 1:
-            xmlbox = obj.find('bndbox')
-            bb = convert_box((w, h), [float(xmlbox.find(x).text) for x in
-                                      ('xmin', 'xmax', 'ymin', 'ymax')])
-            cls_id = names.index(cls)  # class id
-            out_file.write(" ".join([str(a) for a in (cls_id, *bb)]) + '\n')
+    with open(lb_path, 'w') as out_file:
+        for obj in root.iter('object'):
+            cls = obj.find('name').text
+            if cls in names and int(obj.find('difficult').text) != 1:
+                xmlbox = obj.find('bndbox')
+                bb = convert_box((w, h), [float(xmlbox.find(x).text) for x in
+                                          ('xmin', 'xmax', 'ymin', 'ymax')])
+                cls_id = names.index(cls)  # class id
+                out_file.write(" ".join([str(a) for a in (cls_id, *bb)]) + '\n')
+
+    if os.path.getsize(lb_path) == 0:  # ignore images with no objects
+        os.remove(lb_path)
 
 
 def img_label2masks(path_to_label: str, classes: list):
@@ -99,8 +103,8 @@ def get_class_label(path: str, image_id: str, names: list):
 
 
 def prepare_indices(path, num_f, num_w=None):
-    trainval_bbox_ids = open(path / 'ImageSets/Main/trainval.txt','r').read().strip().split()  # imgs with bbox annotation
-    train_seg_ids = open(path / 'ImageSets/Segmentation/train.txt','r').read().strip().split()
+    trainval_bbox_ids = open(path / 'ImageSets/Main/trainval.txt', 'r').read().strip().split()  # imgs with bbox annotation
+    train_seg_ids = open(path / 'ImageSets/Segmentation/train.txt', 'r').read().strip().split()
     val_seg_ids = open(path / 'ImageSets/Segmentation/val.txt', 'r').read().strip().split()
     train_weak_ids = sorted(set(trainval_bbox_ids).difference(set(val_seg_ids)).difference(set(train_seg_ids)))
 
