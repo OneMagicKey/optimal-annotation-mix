@@ -67,7 +67,7 @@ the following structure
             └── leftImg8bit
 ```
 
-or download it from [Google Drive](https://drive.google.com/file/d/1Jb2rGbcOOykIDpoqlSZQXg-DsmC9DGdG/view?usp=drive_link)
+or download it from [Google Drive](https://drive.google.com/file/d/1hGURPYPmmokKKT73cT4ZzcKAQytoDKGd/view?usp=sharing)
 and extract it with the command:
 
 ```bash
